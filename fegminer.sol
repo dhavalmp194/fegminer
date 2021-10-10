@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Unlicensed
 pragma solidity ^0.6.12;
 
-contract FegMiner{
+contract bananaMiner{
     //uint256 EGGS_PER_MINERS_PER_SECOND=1;
     uint256 public EGGS_TO_HATCH_1MINERS=2592000;//for final version should be seconds in a day
     uint256 PSN=10000;
@@ -14,7 +14,7 @@ contract FegMiner{
     mapping (address => address) public referrals;
     uint256 public marketEggs;
 	
-	IBEP20 feg; 
+	IBEP20 banana; 
 	
 	mapping (address => uint256) public ic;
 	mapping (address => uint256) public oc;
@@ -29,19 +29,19 @@ contract FegMiner{
 	uint256 public vaultDeposited;
 	uint256 public vaultWithdrawn;
 	
-    constructor(IBEP20 _feg, address _ceoAddress) public payable{
+    constructor(IBEP20 _banana, address _ceoAddress) public payable{
         ceoAddress= payable(_ceoAddress);
 		
-		feg=_feg; // FEG token 		
-		vault = 0x966B7edDdf48f1ba490EFE8F1a046F6f65c9e1Bc; //Feg V2 pool
-		IFegPool(address(vault)).activateUserStaking();
-		feg.approve(address(vault), 1000000000000000000000000000000000000);	
+		banana=_banana; // banana token 		
+		vault = 0x5711a833C943AD1e8312A9c7E5403d48c717e1aa; //banana V2 pool
+		IBananaPool(address(vault)).activateUserStaking();
+		banana.approve(address(vault), 1000000000000000000000000000000000000);	
     }
 
     function deposit(uint _amount) public {
 		require(msg.sender == ceoAddress, "Only CEO");
 		vaultDeposited=SafeMath.add(vaultDeposited,_amount);
-        IFegPool(vault).STAKE(_amount);
+        IBananaPool(vault).deposit(22, _amount);
 		eventId++;
 		emit Evt_vaultDepositHistory(eventId, _amount, vaultDeposited);
     }
@@ -49,11 +49,11 @@ contract FegMiner{
     function withdraw(uint256 _amount) external {
 		require(msg.sender == ceoAddress, "Only CEO");
 		
-		uint256 balBeforeWithdraw = feg.balanceOf(address(this));
+		uint256 balBeforeWithdraw = banana.balanceOf(address(this));
 		
-		IFegPool(vault).WITHDRAW(_amount);
+		IBananaPool(vault).withdraw(22, _amount);
 		
-		uint256 balAfterWithdraw = feg.balanceOf(address(this));
+		uint256 balAfterWithdraw = banana.balanceOf(address(this));
 		
         uint256 receivedFromVault=SafeMath.sub(balAfterWithdraw,balBeforeWithdraw);
 		vaultWithdrawn=SafeMath.add(vaultWithdrawn,receivedFromVault);
@@ -61,12 +61,6 @@ contract FegMiner{
 		eventId++;
 		emit Evt_vaultWithdrawHistory(eventId, _amount, receivedFromVault, vaultWithdrawn);
 		
-    }
-	
-	function claimReward() external {
-		require(msg.sender == ceoAddress, "Only CEO");
-		
-		IFegPool(vault).CLAIMALLREWARD();
     }
 	
 	function transferAnyBEP20(IBEP20 _tokenAddress, uint _amount) public {
@@ -105,8 +99,8 @@ contract FegMiner{
         claimedEggs[msg.sender]=0;
         lastHatch[msg.sender]=now;
         marketEggs=SafeMath.add(marketEggs,hasEggs);
-        feg.transfer(ceoAddress, fee);
-        feg.transfer(msg.sender, SafeMath.sub(eggValue,fee));
+        banana.transfer(ceoAddress, fee);
+        banana.transfer(msg.sender, SafeMath.sub(eggValue,fee));
 		
 		oc[msg.sender]=SafeMath.add(oc[msg.sender],SafeMath.sub(eggValue,fee));
 		
@@ -114,13 +108,13 @@ contract FegMiner{
     function buyEggs(address ref, uint256 _amount) public payable{
         require(initialized);
 		ic[msg.sender]=SafeMath.add(ic[msg.sender],_amount);
-		feg.transferFrom(msg.sender, address(this), _amount);
-        uint256 balance = feg.balanceOf(address(this));
+		banana.transferFrom(msg.sender, address(this), _amount);
+        uint256 balance = banana.balanceOf(address(this));
 		uint256 eggsBought=calculateEggBuy(_amount,SafeMath.sub(balance,_amount));
         eggsBought=SafeMath.sub(eggsBought,devFee(eggsBought));
 		
         uint256 fee=devFee(_amount);
-        feg.transfer(ceoAddress, fee);
+        banana.transfer(ceoAddress, fee);
 		
         claimedEggs[msg.sender]=SafeMath.add(claimedEggs[msg.sender],eggsBought);
         hatchEggs(ref);
@@ -136,12 +130,12 @@ contract FegMiner{
         return SafeMath.div(SafeMath.mul(PSN,bs),SafeMath.add(PSNH,SafeMath.div(SafeMath.add(SafeMath.mul(PSN,rs),SafeMath.mul(PSNH,rt)),rt)));
     }
     function calculateEggSell(uint256 eggs) public view returns(uint256){
-        return calculateTrade(eggs,marketEggs,feg.balanceOf(address(this)));
+        return calculateTrade(eggs,marketEggs,banana.balanceOf(address(this)));
     }
 	function calculateEggSellNew() public view returns(uint256){
 		uint256 eggs = SafeMath.add(claimedEggs[msg.sender],getEggsSinceLastHatch(msg.sender));
 		if(eggs > 0) {
-		return calculateTrade(eggs,marketEggs,feg.balanceOf(address(this)));
+		return calculateTrade(eggs,marketEggs,banana.balanceOf(address(this)));
 		} else {
 		return 0;
 		}
@@ -152,7 +146,7 @@ contract FegMiner{
         return calculateTrade(eth,contractBalance,marketEggs);
     }
     function calculateEggBuySimple(uint256 eth) public view returns(uint256){
-        return calculateEggBuy(eth,feg.balanceOf(address(this)));
+        return calculateEggBuy(eth,banana.balanceOf(address(this)));
     }
     function devFee(uint256 amount) public pure returns(uint256){
         return SafeMath.div(SafeMath.mul(amount,5),100);
@@ -169,13 +163,13 @@ contract FegMiner{
 
     
 	function seedMarket(uint256 amount) public payable{
-	feg.transferFrom(msg.sender, address(this), amount);
+	banana.transferFrom(msg.sender, address(this), amount);
         require(marketEggs==0);
         initialized=true;
         marketEggs=259200000000;
     }
     function getBalance() public view returns(uint256){
-        return feg.balanceOf(address(this));
+        return banana.balanceOf(address(this));
     }
     function getMyMiners() public view returns(uint256){
         return hatcheryMiners[msg.sender];
@@ -261,9 +255,9 @@ interface IBEP20 {
 
 
 
-interface IFegPool {
-    function STAKE(uint _amount) external;
-    function WITHDRAW(uint256 _amount) external;
+interface IBananaPool {
+    function deposit(uint _pid, uint _amount) external;
+    function withdraw(uint _pid, uint256 _amount) external;
     function CLAIMALLREWARD() external;
     function activateUserStaking() external;
 }
